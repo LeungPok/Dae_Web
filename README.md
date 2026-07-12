@@ -8,8 +8,6 @@
 [![Python](https://img.shields.io/badge/Python-3.9+-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com/)
 
-[开发背景](#-开发背景-why-i-built-this) •  [截图](#-截图-screenshots) • [快速开始](#-快速开始-quick-start) • 
-
 </div>
 
 ---
