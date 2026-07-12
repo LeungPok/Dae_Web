@@ -30,8 +30,8 @@
 
 
 ## 📸 截图 (Screenshots)
-![](\images\1.png)
-![](\images\2.png)
+![编辑器](images/1.png)
+![日志查看器](images/2.png)
 
 
 ## 🛠️ 快速开始 (Quick Start)
