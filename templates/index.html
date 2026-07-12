@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAE Hub</title>
+    <link rel="icon" type="image/svg+xml"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230f172a'/><text x='50' y='72' font-family='system-ui, sans-serif' font-weight='700' font-size='60' fill='white' text-anchor='middle'>D</text></svg>">
+    <script src="https://npm.elemecdn.com/vue@3/dist/vue.global.prod.js"></script>
+    <link rel="stylesheet" href="https://npm.elemecdn.com/element-plus/dist/index.css">
+    <script src="https://npm.elemecdn.com/element-plus"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-family: 'Inter', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            margin: 0;
+        }
+
+        .editor-wrapper {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #282c34;
+        }
+
+        #code-editor {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ace_editor {
+            border: none !important;
+        }
+
+        .log-terminal::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .log-terminal::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-terminal::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+
+        .log-terminal::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+
+        .status-glow-active {
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+        }
+
+        .status-glow-inactive {
+            box-shadow: 0 0 8px rgba(100, 116, 139, 0.3);
+        }
+
+
+        .action-btn {
+            width: 100%;
+            height: 44px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: nowrap;
+            margin: 0;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="h-screen flex flex-col overflow-hidden">
+    <header class="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-slate-200 z-50">
+        <div class="h-full max-w-[1600px] mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                        D
+                    </div>
+                    <h1 class="text-lg font-semibold text-slate-900 tracking-tight">DAE Hub</h1>
+                </div>
+                <div class="flex bg-slate-100 p-1 rounded-lg">
+                    <button @click="activeTab = 'editor'"
+                            :class="activeTab === 'editor' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'"
+                            class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        编辑配置
+                    </button>
+                    <button @click="activeTab = 'logs'"
+                            :class="activeTab === 'logs' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'"
+                            class="px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        实时日志
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500"
+                 :class="isDaeActive ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span v-if="isDaeActive"
+                          class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 transition-colors duration-500"
+                          :class="isDaeActive ? 'bg-emerald-500 status-glow-active' : 'bg-slate-400 status-glow-inactive'"></span>
+                </span>
+                <span class="text-xs font-medium"
+                      :class="isDaeActive ? 'text-emerald-700' : 'text-slate-500'">{{ isDaeActive ? '核心运行中' : '核心已停止'
+                    }}</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col overflow-hidden px-6 py-6 max-w-[1600px] w-full mx-auto">
+        <div v-show="activeTab === 'editor'" class="flex-1 grid grid-cols-12 gap-6 overflow-hidden">
+
+            <!-- 【修改】左侧宽度调整为 8/12 -->
+            <div class="col-span-12 lg:col-span-9 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center px-1 mb-3 shrink-0">
+                    <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                        </svg>
+                        配置文件
+                    </h2>
+                    <span class="text-xs text-slate-400 font-mono bg-slate-100 px-2 py-1 rounded-md">/etc/dae/config.dae</span>
+                </div>
+                <div class="editor-wrapper flex-1 min-h-0 flex flex-col overflow-hidden relative">
+                    <div v-if="editorLoading"
+                         class="absolute inset-0 z-10 bg-[#282c34] flex flex-col items-center justify-center gap-4">
+                        <div class="w-8 h-8 border-2 border-slate-600 border-t-white rounded-full animate-spin"></div>
+                        <span class="text-slate-400 text-sm">正在加载编辑器...</span>
+                    </div>
+                    <div id="code-editor" class="transition-opacity duration-300"
+                         :class="{'opacity-0': editorLoading}"></div>
+                </div>
+            </div>
+
+            <!-- 【修改】右侧宽度调整为 4/12 -->
+            <div class="col-span-12 lg:col-span-3 flex flex-col gap-6 overflow-y-auto pr-1">
+
+                <!-- 核心操作面板 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-5 shrink-0">
+                    <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                        </svg>
+                        核心操作
+                    </h3>
+
+                    <div class="flex flex-col gap-3">
+                        <button
+                                class="action-btn rounded-lg bg-slate-900 border border-slate-900 hover:bg-slate-700 text-sm font-medium text-white whitespace-nowrap"
+                                @click="saveConfig"
+                                :disabled="saving">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                            </svg>
+                            <span>{{ saving ? '保存中...' : '保存配置' }}</span>
+                        </button>
+
+                        <button
+                                class="action-btn rounded-lg bg-orange-150 border border-orange-300 hover:bg-orange-500 text-sm font-medium text-orange-80 whitespace-nowrap"
+                                @click="reloadDae"
+                                :disabled="reloading">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+                            </svg>
+                            <!-- 动态文字 -->
+                            <span>{{ reloading ? '重载中...' : '重载生效' }}</span>
+                        </button>
+
+                    </div>
+                    <div class="text-[11px] text-slate-400 text-center mt-1">
+                        提示：使用 <kbd class="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 font-mono">Ctrl+S</kbd>
+                        快速保存，重载之前记得先保存！
+                    </div>
+                </div>
+
+                <!-- 【修改】历史备份卡片：增加手动备份按钮，列表增加导出按钮 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4 shrink-0">
+                    <!-- 头部：标题 + 手动备份按钮 -->
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            历史备份（最多10个）
+                        </h3>
+                        <!-- 手动备份按钮：绿色描边 + 数据库图标 -->
+                        <button
+                                class="inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-medium border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-400 transition-colors shrink-0 cursor-pointer whitespace-nowrap"
+                                @click="createBackup" :disabled="backingUp">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"></path>
+                            </svg>
+                            {{ backingUp ? '备份中...' : '手动备份' }}
+                        </button>
+                    </div>
+
+                    <!-- 备份列表 -->
+                    <div class="flex flex-col gap-2 max-h-100 overflow-y-auto pr-1 custom-scrollbar">
+                        <div v-if="backups.length === 0" class="text-xs text-slate-400 text-center py-6">暂无备份记录
+                        </div>
+                        <div v-for="backup in backups" :key="backup"
+                             class="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-100 hover:bg-slate-50 hover:border-slate-200 transition-all duration-200 group">
+
+                            <span class="text-xs font-mono text-slate-600 truncate flex-1 mr-3" :title="backup">
+                                {{ formatBackupName(backup) }}
+                            </span>
+
+                            <!-- 操作按钮组 -->
+                            <div class="flex items-center gap-2 shrink-0">
+                                <!-- 导出/下载按钮：紫色描边 + 下载图标 -->
+                                <button
+                                        class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium border border-purple-300 text-purple-700 bg-purple-50 hover:bg-purple-100 hover:border-purple-400 transition-colors cursor-pointer whitespace-nowrap"
+                                        @click="downloadBackup(backup)">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+                                    </svg>
+                                    导出
+                                </button>
+
+                                <!-- 恢复按钮：橙色描边 + 回退图标 -->
+                                <button
+                                        class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs font-medium border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:border-amber-400 transition-colors cursor-pointer whitespace-nowrap"
+                                        @click="restoreSpecificBackup(backup)">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"></path>
+                                    </svg>
+                                    恢复
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="activeTab === 'logs'" class="flex-1 flex flex-col overflow-hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <h3 class="text-base font-semibold text-slate-700">实时日志</h3>
+                        <span class="text-[10px] text-slate-400 font-mono bg-slate-100 px-2 py-1 rounded">journalctl -u dae</span>
+                    </div>
+                    <el-button size="small" type="info" link class="!text-xs" @click="logs = []">清空日志</el-button>
+                </div>
+                <div ref="logRef"
+                     class="log-terminal flex-1 min-h-0 bg-slate-900 text-slate-300 font-mono text-[13px] leading-relaxed p-6 overflow-y-auto">
+                    <div v-if="logs.length === 0" class="text-slate-600 text-center mt-20 text-sm">等待日志输出...</div>
+                    <div v-for="(log, index) in logs" :key="index"
+                         class="py-0.5 hover:bg-slate-800/50 px-2 rounded transition-colors">
+                        <span :class="log.toLowerCase().includes('error') ? 'text-red-400 font-medium' : ''">{{ log
+                            }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const {createApp, ref, onMounted, nextTick, watch} = Vue;
+    const {ElMessage, ElMessageBox} = ElementPlus;
+
+    createApp({
+        setup() {
+            const activeTab = ref('editor');
+            const editorLoading = ref(true);
+            const saving = ref(false);
+            const reloading = ref(false);
+            const restoring = ref(false);
+            const backingUp = ref(false);
+            const isDaeActive = ref(false);
+            const backups = ref([]);
+            const logs = ref([]);
+            const logRef = ref(null);
+            let editor = null;
+            let statusInterval = null;
+
+            const checkStatus = async () => {
+                try {
+                    const res = await fetch('/api/status');
+                    const data = await res.json();
+                    isDaeActive.value = data.active;
+                } catch (e) {
+                    isDaeActive.value = false;
+                }
+            };
+
+            const initEditor = (initialCode) => {
+                const editorEl = document.getElementById('code-editor');
+                editor = ace.edit(editorEl);
+                editor.setTheme("ace/theme/dracula");
+                editor.session.setMode("ace/mode/ini");
+
+                editor.setOptions({
+                    fontSize: "14px",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    showPrintMargin: false,
+                    highlightActiveLine: true,
+                    tabSize: 4,
+                    useSoftTabs: true,
+                    wrap: true,
+                    showGutter: true,
+                    scrollPastEnd: 0.15,
+                });
+
+                editor.setValue(initialCode, -1);
+                editor.commands.addCommand({
+                    name: 'save',
+                    bindKey: {win: 'Ctrl-S', mac: 'Command-S'},
+                    exec: saveConfig
+                });
+                editorLoading.value = false;
+            };
+
+            const fetchConfig = async () => {
+                try {
+                    const res = await fetch('/api/config');
+                    const data = await res.json();
+                    if (res.ok) initEditor(data.content);
+                    else {
+                        ElMessage.error({message: data.detail || '获取配置失败', plain: true});
+                        editorLoading.value = false;
+                    }
+                } catch {
+                    ElMessage.error({message: '无法连接后端服务', plain: true});
+                    editorLoading.value = false;
+                }
+            };
+
+            const saveConfig = async () => {
+                if (!editor) return;
+                saving.value = true;
+                try {
+                    const res = await fetch('/api/config/save', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({content: editor.getValue()})
+                    });
+                    if (res.ok) ElMessage.success({message: '保存成功', plain: true});
+                    else {
+                        const err = await res.json();
+                        ElMessage.error({message: err.detail || '保存失败', plain: true});
+                    }
+                } finally {
+                    saving.value = false;
+                }
+            };
+
+            const createBackup = async () => {
+                backingUp.value = true;
+                try {
+                    const res = await fetch('/api/backups/create', {method: 'POST'});
+                    if (res.ok) {
+                        ElMessage.success({message: '手动备份成功', plain: true});
+                        fetchBackups();
+                    } else {
+                        const err = await res.json();
+                        ElMessage.error({message: err.detail || '备份失败', plain: true});
+                    }
+                } finally {
+                    backingUp.value = false;
+                }
+            };
+
+            // 【修改】下载指定的备份文件
+            const downloadBackup = (filename) => {
+                window.open(`/api/backups/download/${filename}`, '_blank');
+            };
+
+            const reloadDae = async () => {
+                reloading.value = true;
+                try {
+                    const res = await fetch('/api/config/reload', {method: 'POST'});
+                    if (res.ok) ElMessage.success({message: '重载指令已发送', plain: true});
+                    else {
+                        const err = await res.json();
+                        ElMessage.error({message: err.detail || '重载失败', plain: true});
+                    }
+                    await checkStatus();
+                } finally {
+                    reloading.value = false;
+                }
+            };
+
+            const fetchBackups = async () => {
+                try {
+                    const res = await fetch('/api/backups');
+                    const data = await res.json();
+                    if (res.ok && data.backups) {
+                        backups.value = data.backups.slice(0, 10);
+                    } else {
+                        backups.value = [];
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+
+            const restoreSpecificBackup = (filename) => {
+                ElMessageBox.confirm(`确定要覆盖当前配置，恢复至 ${formatBackupName(filename)} 吗？`, '确认恢复', {
+                    confirmButtonText: '确定恢复', cancelButtonText: '取消', type: 'warning'
+                }).then(async () => {
+                    restoring.value = true;
+                    try {
+                        const res = await fetch(`/api/backups/restore/${filename}`, {method: 'POST'});
+                        if (res.ok) {
+                            ElMessage.success({message: '恢复成功', plain: true});
+                            const configRes = await fetch('/api/config');
+                            const configData = await configRes.json();
+                            if (editor) editor.setValue(configData.content, -1);
+                            fetchBackups();
+                        } else {
+                            const err = await res.json();
+                            ElMessage.error({message: err.detail || '恢复失败', plain: true});
+                        }
+                    } finally {
+                        restoring.value = false;
+                    }
+                }).catch(() => {
+                });
+            };
+
+            const initLogSocket = () => {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const ws = new WebSocket(`${protocol}//${window.location.host}/ws/logs`);
+                ws.onmessage = (event) => {
+                    logs.value.push(event.data);
+                    if (logs.value.length > 500) logs.value.shift();
+                    nextTick(() => {
+                        if (logRef.value) logRef.value.scrollTop = logRef.value.scrollHeight;
+                    });
+                };
+                ws.onclose = () => setTimeout(initLogSocket, 3000);
+            };
+
+            const formatBackupName = (name) => {
+                const p = name.split('.');
+                if (p.length >= 2) {
+                    const t = p[1];
+                    if (t.length >= 15) return `${t.substr(0, 4)}-${t.substr(4, 2)}-${t.substr(6, 2)} ${t.substr(9, 2)}:${t.substr(11, 2)}:${t.substr(13, 2)}`;
+                }
+                return name;
+            };
+
+            watch(activeTab, (newTab) => {
+                if (newTab === 'editor' && editor) {
+                    nextTick(() => {
+                        editor.resize();
+                    });
+                }
+            });
+
+            onMounted(() => {
+                fetchConfig();
+                fetchBackups();
+                initLogSocket();
+                checkStatus();
+                statusInterval = setInterval(checkStatus, 5000);
+            });
+
+            return {
+                activeTab, editorLoading, saving, reloading, restoring, backingUp,
+                isDaeActive, backups, logs, logRef,
+                saveConfig, createBackup, downloadBackup, reloadDae, restoreSpecificBackup, formatBackupName
+            };
+        }
+    }).use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>
