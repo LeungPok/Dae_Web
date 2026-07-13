@@ -10,7 +10,7 @@ from pydantic import BaseModel
 CONFIG_PATH = "/etc/dae/config.dae"
 BACKUP_DIR = "/etc/dae/backups"
 
-app = FastAPI(title="DAE Admin Dashboard")
+app = FastAPI(title="DAE Admin Hub")
 
 if not os.path.exists(BACKUP_DIR):
     os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -54,18 +54,45 @@ def get_config():
         raise HTTPException(status_code=500, detail=f"读取失败: {str(e)}")
 
 
-# 【修改】保存配置不再自动备份
+
 @app.post("/api/config/save")
 def save_config(config: ConfigModel):
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.dae', delete=False, encoding='utf-8') as temp_file:
+        temp_file.write(config.content)
+        temp_file_path = temp_file.name
+
+    try:
+        dae_bin = shutil.which("dae") or "/usr/bin/dae"
+        result = subprocess.run(
+            [dae_bin, "validate", "-c", temp_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            error_msg = result.stderr.strip() if result.stderr else result.stdout.strip()
+            raise HTTPException(
+                status_code=400,
+                detail=f"配置文件校验未通过，已拒绝保存！错误信息：\n{error_msg}"
+            )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=500, detail="校验超时")
+    finally:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             f.write(config.content)
-        return {"status": "success", "message": "保存成功"}
+        return {"status": "success", "message": "校验通过，保存成功"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"保存失败: {str(e)}")
 
 
-# 【新增】手动创建备份接口
+# 手动创建备份接口
 @app.post("/api/backups/create")
 def create_backup():
     try:
@@ -82,7 +109,7 @@ def create_backup():
         raise HTTPException(status_code=500, detail=f"备份失败: {str(e)}")
 
 
-# 【新增】下载备份文件接口
+# 下载备份文件接口
 @app.get("/api/backups/download/{filename}")
 def download_backup(filename: str):
     file_path = os.path.join(BACKUP_DIR, filename)
